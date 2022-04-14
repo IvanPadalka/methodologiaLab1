@@ -1,0 +1,201 @@
+#include "window.h"
+
+void window::FillVectors(QVector<double> &x, QVector<double> &y)
+{
+   /* y.push_back(2.8);   
+    y.push_back(6.1);
+    y.push_back(10.9);
+    y.push_back(18.1);
+    y.push_back(27.3);
+    y.push_back(38);*/
+
+    y.push_back(38279);
+    y.push_back(45651);
+    y.push_back(51793);
+    y.push_back(59142 );
+    y.push_back(71232);
+    y.push_back(85142);
+    y.push_back(100123);
+
+    for(int i = 0; i < y.size(); i++)
+    {
+        x.push_back(i);
+    }
+}
+
+void window::ApproximateLinear(QVector<double> &x, QVector<double> &y, QVector<double> &result)
+{
+    double a1 = CalculateCoefficients(x, y, 1);
+    double a2 = CalculateCoefficients(x, y, 2);
+
+    for(int i = 0;i < x.size(); i++)
+    {
+        result.push_back(CalculateLinear(a1, a2, x.at(i)));
+    }
+}
+
+double window::Sum(const QVector <double>& input)
+{
+    return std::accumulate(input.begin(), input.end(), 0);
+}
+
+double window::CalculateCoefficients(QVector <double>& x,QVector <double>& y,int kind)
+{
+    QVector <double> xy, xx;
+
+    for(int i = 0; i < x.size(); i++)
+    {
+        xy.push_back(x.at(i) * y.at(i));
+        xx.push_back(pow(x.at(i), 2));
+    }
+
+    double sumX = Sum(x);
+    double sumY = Sum(y);
+    double sumXX = Sum(xx);
+    double sumXY = Sum(xy);
+    int elementsCount = x.size();
+
+
+    if (kind == 1)
+    {
+        return (sumY * sumXX - sumXY * sumX) / (elementsCount * sumXX - pow(sumX, 2));
+    }
+
+    return (elementsCount * sumXY - sumX * sumY) / (elementsCount * sumXX - pow(sumX, 2));
+}
+
+double window::CalculateLinear(double a1, double a2, double x)
+{
+    return a2 * x + a1;
+}
+
+void window::FillPlot(QCustomPlot *plot, QVector<double> &x, QVector<double> &y, QVector<double> &result)
+{
+    plot->addGraph();
+    plot->graph(0)->setData(x, y);
+
+    plot->addGraph();
+    plot->graph(1)->setPen(QPen(Qt::green));
+    plot->graph(1)->setData(x, result);
+
+    plot->yAxis->setRange(*std::min_element(result.begin(), result.end()), *std::max_element(result.begin(), result.end()));
+    plot->xAxis->setRange(*std::min_element(x.begin(), x.end()), *std::max_element(x.begin(), x.end()));
+
+    plot->setInteractions(QCP::iSelectPlottables | QCP::iRangeDrag | QCP::iRangeZoom);
+}
+
+void window::ClearVectors(QVector<double> &x, QVector<double> &y, QVector<double> &result)
+{
+    x.clear();
+    y.clear();
+    result.clear();
+}
+
+double window::CalculateKramerCoefficient(QVector <double> &x,QVector <double> &y, int kind)
+{
+    QVector <double> xy, xx ,xc ,xq ,xxy;
+    for(int i = 0; i < x.size(); i++)
+    {
+        xy.push_back(x.at(i) * y.at(i));
+        xx.push_back(pow(x.at(i), 2));
+        xc.push_back(pow(x.at(i), 3));
+        xq.push_back(pow(x.at(i), 4));
+        xxy.push_back(pow(x.at(i), 2) * y.at(i));
+    }
+
+    double sumX = Sum(x);
+    double sumY = Sum(y);
+    double sumXY = Sum(xy);
+    double sumXX = Sum(xx);
+    double sumXC = Sum(xc);
+    double sumXQ = Sum(xq);
+    double sumXXY = Sum(xxy);
+    double constant = 100.0;
+
+    double detr = CalculateDeterminant(sumXX, sumXC, sumXQ, sumX, sumXX, sumXC, constant, sumX, sumXX);
+    double secondDetr;
+
+    switch(kind)
+    {
+    case 1:
+        secondDetr = CalculateDeterminant(sumXXY, sumXC, sumXQ, sumXY, sumXX, sumXC, sumY, sumX, sumXX);
+        break;
+    case 2:
+        secondDetr = CalculateDeterminant(sumXX, sumXXY, sumXQ, sumX, sumXY, sumXC, constant, sumY, sumXX);
+        break;
+    case 3:
+        secondDetr = CalculateDeterminant(sumXX, sumXC, sumXXY, sumX, sumXX, sumXY, constant, sumX, sumY);
+        break;
+    default:
+        break;
+    }
+    return secondDetr / detr;
+}
+
+void window::ApproximateQuadratic(QVector<double> &x, QVector<double> &y, QVector<double> &result)
+{
+    double coef1 = CalculateKramerCoefficient(x, y, 1);
+    double coef2 = CalculateKramerCoefficient(x, y, 2);
+    double coef3 = CalculateKramerCoefficient(x, y, 3);
+
+    for(int i = 0; i < x.size(); i++)
+    {
+        result.push_back(CalculateQuadratic(coef1, coef2, coef3, x.at(i)));
+    }
+}
+
+double window::CalculateQuadratic(double a1, double a2, double a3, double x)
+{
+    return a3 * pow(x, 2) + a2 * x + a1;
+}
+
+double window::CalculateDeterminant(double a1, double a2, double a3, double a4, double a5, double a6, double a7, double a8, double a9)
+{
+    return a1 * (a5 * a9 - a8 * a6) - a2 * (a4 * a9 - a7 * a6) + a3 * (a4 * a8 - a7 * a5);
+}
+
+void window::WriteDifference(QTextEdit *text, QVector<double> &y, QVector<double> &result, QString name)
+{
+    QString toAppend;
+    toAppend.append("y\tresult\tdifference\n");
+    for (int i = 0; i < y.size(); i++)
+    {
+        double difference = std::abs(y.at(i) - result.at(i));
+        toAppend.append(QString::number(y.at(i)) + '\t' + QString::number(result.at(i)) + '\t' + QString::number(difference) +'\n');
+    }
+
+    text->setText(text->toPlainText() + name + '\n' + toAppend);
+}
+
+
+window::window(QWidget *parent)
+    : QDialog(parent)
+{
+    QVector<double> x, y, result;
+    QTextEdit *text = new QTextEdit;
+
+    FillVectors(x, y);
+    ApproximateLinear(x, y, result);
+    QCustomPlot *linearPlot = new QCustomPlot;
+    FillPlot(linearPlot, x, y, result);
+    WriteDifference(text, y, result, "Linear");
+    ClearVectors(x, y, result);
+
+    FillVectors(x, y);
+    ApproximateQuadratic(x, y, result);
+    QCustomPlot *quadraticPlot = new QCustomPlot;
+    FillPlot(quadraticPlot, x, y, result);
+    WriteDifference(text, y, result, "Quadratic");
+
+    text->setFixedSize(300, 850);
+
+    QHBoxLayout *layout=new QHBoxLayout;
+    layout->addWidget(linearPlot);
+    layout->addWidget(quadraticPlot);
+    layout->addWidget(text);
+    this->setLayout(layout);
+    this->setFixedSize(1800,900);
+}
+
+window::~window(){} 
+
